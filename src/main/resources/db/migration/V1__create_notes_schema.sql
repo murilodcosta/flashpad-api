@@ -1,0 +1,6 @@
+CREATE TABLE notes (
+    id BIGSERIAL PRIMARY KEY,
+    content TEXT,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP
+);
