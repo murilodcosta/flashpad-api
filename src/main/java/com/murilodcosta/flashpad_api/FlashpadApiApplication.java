@@ -1,0 +1,13 @@
+package com.murilodcosta.flashpad_api;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class FlashpadApiApplication {
+
+	public static void main(String[] args) {
+		SpringApplication.run(FlashpadApiApplication.class, args);
+	}
+
+}
