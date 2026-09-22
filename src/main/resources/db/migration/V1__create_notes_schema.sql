@@ -1,6 +1,7 @@
 CREATE TABLE notes (
     id BIGSERIAL PRIMARY KEY,
+    path VARCHAR(255) NOT NULL UNIQUE,
     content TEXT,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP
-);
+);
