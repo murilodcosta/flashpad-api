@@ -1,7 +1,9 @@
 package com.murilodcosta.flashpad_api.entity;
 
 import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.time.LocalDateTime;
@@ -10,23 +12,9 @@ import java.time.LocalDateTime;
 @Table(name = "notes")
 @Getter
 @Setter
+@NoArgsConstructor
+@AllArgsConstructor
 public class Note {
-
-    public Note() {
-    }
-
-    public Note(String path, String content) {
-        this.path = path;
-        this.content = content;
-    }
-
-    public Note(Long id, String path, String content, LocalDateTime createdAt, LocalDateTime updatedAt) {
-        this.id = id;
-        this.path = path;
-        this.content = content;
-        this.createdAt = createdAt;
-        this.updatedAt = updatedAt;
-    }
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -42,6 +30,11 @@ public class Note {
 
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    public Note(String path, String content) {
+        this.path = path;
+        this.content = content;
+    }
 
     @PrePersist
     public void prePersist() {
