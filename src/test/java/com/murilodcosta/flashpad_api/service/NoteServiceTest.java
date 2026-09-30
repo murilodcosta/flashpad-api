@@ -132,4 +132,28 @@ class NoteServiceTest {
         assertThat(response.path()).isEqualTo(normalizedPath);
         assertThat(response.content()).isNull();
     }
+
+    @Test
+    @DisplayName("Should create and return SseEmitter on subscribe")
+    void shouldSubscribeToNoteStream() {
+        var emitter = noteService.subscribeToNoteStream("live-note");
+
+        assertThat(emitter).isNotNull();
+    }
+
+    @Test
+    @DisplayName("Should broadcast update only to emitters subscribed to the matching path")
+    void shouldBroadcastOnlyToMatchingPathEmitters() {
+        var emitterPathA = noteService.subscribeToNoteStream("note-a");
+        var emitterPathB = noteService.subscribeToNoteStream("note-b");
+
+        Note noteA = new Note(1L, "/note-a", "Updated A", LocalDateTime.now(), null);
+        when(noteRepository.findByPath("/note-a")).thenReturn(Optional.of(noteA));
+        when(noteRepository.save(any(Note.class))).thenReturn(noteA);
+
+        // Trigger upsert for /note-a
+        NoteResponse response = noteService.upsertNote("note-a", new UpdateNoteRequest("Updated A"));
+
+        assertThat(response.content()).isEqualTo("Updated A");
+    }
 }

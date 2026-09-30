@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flashpad - Live Notepad (SSE)</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --border-color: #334155;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --accent-color: #38bdf8;
+            --accent-hover: #0284c7;
+            --success-color: #22c55e;
+            --error-color: #ef4444;
+            --warning-color: #eab308;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            min-height: 100vh;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: var(--card-bg);
+            padding: 16px 24px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--accent-color);
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            background-color: rgba(239, 68, 68, 0.15);
+            color: var(--error-color);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            transition: all 0.3s ease;
+        }
+
+        .status-badge.connected {
+            background-color: rgba(34, 197, 94, 0.15);
+            color: var(--success-color);
+            border-color: rgba(34, 197, 94, 0.3);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: currentColor;
+        }
+
+        .status-badge.connected .status-dot {
+            box-shadow: 0 0 10px var(--success-color);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        .controls {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            background-color: var(--card-bg);
+            padding: 16px 24px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            flex-wrap: wrap;
+        }
+
+        .path-group {
+            display: flex;
+            align-items: center;
+            background: #0f172a;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 0 12px;
+            flex: 1;
+            min-width: 250px;
+        }
+
+        .path-group span {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            user-select: none;
+        }
+
+        .path-input {
+            background: transparent;
+            border: none;
+            color: var(--text-primary);
+            padding: 10px 8px;
+            font-size: 0.95rem;
+            outline: none;
+            width: 100%;
+        }
+
+        button {
+            cursor: pointer;
+            border: none;
+            border-radius: 8px;
+            padding: 10px 18px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: all 0.2s ease;
+        }
+
+        .btn-connect {
+            background-color: var(--accent-color);
+            color: #0f172a;
+        }
+
+        .btn-connect:hover {
+            background-color: var(--accent-hover);
+        }
+
+        .btn-save {
+            background-color: var(--success-color);
+            color: #0f172a;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-save:hover {
+            filter: brightness(1.1);
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+            flex: 1;
+        }
+
+        @media (max-width: 900px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .editor-container {
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .editor-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 18px;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        textarea {
+            flex: 1;
+            width: 100%;
+            min-height: 450px;
+            padding: 18px;
+            background: transparent;
+            border: none;
+            color: var(--text-primary);
+            font-size: 1.05rem;
+            line-height: 1.6;
+            resize: none;
+            outline: none;
+            font-family: inherit;
+        }
+
+        .log-container {
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            max-height: 520px;
+        }
+
+        .log-header {
+            padding: 14px 18px;
+            border-bottom: 1px solid var(--border-color);
+            font-weight: 600;
+            font-size: 0.95rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .log-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            font-family: monospace;
+            font-size: 0.85rem;
+        }
+
+        .log-item {
+            padding: 8px 12px;
+            border-radius: 6px;
+            background-color: rgba(15, 23, 42, 0.6);
+            border-left: 3px solid var(--accent-color);
+        }
+
+        .log-item.update {
+            border-left-color: var(--success-color);
+        }
+
+        .log-item.sent {
+            border-left-color: #a855f7;
+        }
+
+        .log-item.error {
+            border-left-color: var(--error-color);
+        }
+
+        .log-time {
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+            margin-bottom: 4px;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo">
+            <span>⚡ Flashpad</span>
+            <span style="font-weight: normal; font-size: 0.9rem; color: var(--text-secondary);">Real-Time SSE Sync</span>
+        </div>
+        <div id="statusBadge" class="status-badge">
+            <span class="status-dot"></span>
+            <span id="statusText">Disconnected</span>
+        </div>
+    </header>
+
+    <div class="controls">
+        <div class="path-group">
+            <span>/api/v1/notes/</span>
+            <input type="text" id="pathInput" class="path-input" value="my-note" placeholder="enter note path...">
+        </div>
+        <button id="btnConnect" class="btn-connect" onclick="toggleConnection()">Connect Stream</button>
+        <button id="btnSave" class="btn-save" onclick="saveNote()">
+            <span>💾</span> Save Note (PUT)
+        </button>
+    </div>
+
+    <div class="grid">
+        <div class="editor-container">
+            <div class="editor-header">
+                <span id="noteInfo">Note: /my-note</span>
+                <span id="lastUpdated">Last updated: --</span>
+            </div>
+            <textarea id="noteContent" placeholder="Type something here... Any updates sent via Postman or another browser tab will sync live on this screen!"></textarea>
+        </div>
+
+        <div class="log-container">
+            <div class="log-header">
+                <span>Event Feed (SSE)</span>
+                <button onclick="clearLogs()" style="background: transparent; color: var(--text-secondary); padding: 4px 8px; font-size: 0.75rem;">Clear</button>
+            </div>
+            <div id="logList" class="log-list">
+                <div class="log-item">
+                    <div class="log-time">System</div>
+                    <div>Ready. Click <b>Connect Stream</b> to begin.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let eventSource = null;
+        const pathInput = document.getElementById('pathInput');
+        const statusBadge = document.getElementById('statusBadge');
+        const statusText = document.getElementById('statusText');
+        const btnConnect = document.getElementById('btnConnect');
+        const noteContent = document.getElementById('noteContent');
+        const noteInfo = document.getElementById('noteInfo');
+        const lastUpdated = document.getElementById('lastUpdated');
+        const logList = document.getElementById('logList');
+
+        function logEvent(title, detail, type = 'default') {
+            const now = new Date().toLocaleTimeString();
+            const item = document.createElement('div');
+            item.className = `log-item ${type}`;
+            item.innerHTML = `
+                <div class="log-time">${now} - ${title}</div>
+                <div>${detail}</div>
+            `;
+            logList.prepend(item);
+        }
+
+        function clearLogs() {
+            logList.innerHTML = '';
+        }
+
+        function getCleanPath() {
+            let path = pathInput.value.trim();
+            if (path.startsWith('/')) path = path.substring(1);
+            return path || 'my-note';
+        }
+
+        async function loadInitialNote(path) {
+            try {
+                const response = await fetch(`/api/v1/notes/${path}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    noteContent.value = data.content || '';
+                    lastUpdated.innerText = `Last updated: ${new Date(data.updatedAt || data.createdAt).toLocaleTimeString()}`;
+                    logEvent('GET Note', `Initial content loaded (${(data.content || '').length} characters)`);
+                } else if (response.status === 404) {
+                    logEvent('GET 404', 'Note not created in database yet. Start typing to create it!');
+                }
+            } catch (err) {
+                console.error("Failed to load initial note:", err);
+            }
+        }
+
+        function toggleConnection() {
+            if (eventSource) {
+                disconnectStream();
+            } else {
+                connectStream();
+            }
+        }
+
+        function connectStream() {
+            const path = getCleanPath();
+            const streamUrl = `/api/v1/notes/${path}/stream`;
+
+            disconnectStream();
+
+            logEvent('Connecting', `Opening SSE stream at: ${streamUrl}`);
+            statusText.innerText = 'Connecting...';
+
+            loadInitialNote(path);
+
+            eventSource = new EventSource(streamUrl);
+
+            eventSource.onopen = () => {
+                statusBadge.classList.add('connected');
+                statusText.innerText = 'Live (Connected)';
+                btnConnect.innerText = 'Disconnect';
+                btnConnect.style.backgroundColor = 'var(--error-color)';
+                btnConnect.style.color = '#fff';
+                noteInfo.innerText = `Note: /${path}`;
+                logEvent('Connected', `Listening for real-time events on /${path}`, 'update');
+            };
+
+            eventSource.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    logEvent('⚡ SSE Received', `New content received (${(data.content || '').length} chars)`, 'update');
+                    noteContent.value = data.content || '';
+                    lastUpdated.innerText = `Last updated: ${new Date(data.updatedAt || data.createdAt || Date.now()).toLocaleTimeString()}`;
+                } catch (e) {
+                    logEvent('⚡ SSE Raw', event.data, 'update');
+                }
+            };
+
+            eventSource.onerror = (err) => {
+                console.warn('SSE Error / Reconnecting...', err);
+                statusBadge.classList.remove('connected');
+                statusText.innerText = 'Reconnecting...';
+            };
+        }
+
+        function disconnectStream() {
+            if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+                statusBadge.classList.remove('connected');
+                statusText.innerText = 'Disconnected';
+                btnConnect.innerText = 'Connect Stream';
+                btnConnect.style.backgroundColor = 'var(--accent-color)';
+                btnConnect.style.color = '#0f172a';
+                logEvent('Disconnected', 'SSE connection closed.');
+            }
+        }
+
+        async function saveNote() {
+            const path = getCleanPath();
+            const content = noteContent.value;
+
+            try {
+                logEvent('Sending PUT', `Saving note to /api/v1/notes/${path}...`, 'sent');
+                const response = await fetch(`/api/v1/notes/${path}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ content: content })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    lastUpdated.innerText = `Last updated: ${new Date(data.updatedAt || data.createdAt || Date.now()).toLocaleTimeString()}`;
+                    logEvent('PUT 200 OK', 'Note saved and broadcast to all connected clients!', 'sent');
+                } else {
+                    const error = await response.json();
+                    logEvent('PUT Error', error.detail || 'Failed to save note', 'error');
+                }
+            } catch (err) {
+                logEvent('Network Error', err.message, 'error');
+            }
+        }
+
+        // Automatically connect to the default note on page load
+        window.addEventListener('DOMContentLoaded', () => {
+            connectStream();
+        });
+    </script>
+</body>
+</html>

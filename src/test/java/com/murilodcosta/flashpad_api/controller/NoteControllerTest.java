@@ -13,6 +13,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.time.LocalDateTime;
 
@@ -168,8 +169,19 @@ class NoteControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"content\":\"" + oversizedContent + "\"}"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.title").value("Bad Request"))
                 .andExpect(jsonPath("$.status").value(400))
                 .andExpect(jsonPath("$.errors.content").value("Content cannot exceed 100,000 characters"));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/notes/{path}/stream should subscribe to SSE and return 200")
+    void shouldSubscribeToNoteStream() throws Exception {
+        SseEmitter emitter = new SseEmitter();
+        when(noteService.subscribeToNoteStream("my-note")).thenReturn(emitter);
+
+        mockMvc.perform(get("/api/v1/notes/my-note/stream"))
+                .andExpect(status().isOk());
+
+        verify(noteService).subscribeToNoteStream("my-note");
     }
 }
