@@ -5,7 +5,7 @@ import com.murilodcosta.flashpad_api.dto.UpdateNoteRequest;
 import com.murilodcosta.flashpad_api.entity.Note;
 import com.murilodcosta.flashpad_api.exception.NoteNotFoundException;
 import com.murilodcosta.flashpad_api.repository.NoteRepository;
-import com.murilodcosta.flashpad_api.util.PathNormalizer;
+import com.murilodcosta.flashpad_api.util.SlugValidator;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -21,8 +21,8 @@ public class NoteService {
 
     private final NoteRepository noteRepository;
 
-    // thread-safe map associating each normalized path with its connected clients via SSE
-    private final Map<String, List<SseEmitter>> emittersByPath = new ConcurrentHashMap<>();
+    // thread-safe map associating each slug with its connected clients via SSE
+    private final Map<String, List<SseEmitter>> emittersBySlug = new ConcurrentHashMap<>();
 
     public NoteService(NoteRepository noteRepository) {
         this.noteRepository = noteRepository;
@@ -30,49 +30,49 @@ public class NoteService {
 
     @Transactional(readOnly = true)
     public NoteResponse getNoteBySlug(String rawSlug) {
-        return getNoteByPath(rawSlug);
+        String slug = SlugValidator.validate(rawSlug);
+        return noteRepository.findByPath(slug)
+                .map(NoteResponse::fromEntity)
+                .orElseThrow(() -> new NoteNotFoundException("Note not found with slug: " + slug));
     }
 
     @Transactional(readOnly = true)
     public NoteResponse getNoteByPath(String rawPath) {
-        String normalizedPath = PathNormalizer.normalize(rawPath);
-        return noteRepository.findByPath(normalizedPath)
-                .map(NoteResponse::fromEntity)
-                .orElseThrow(() -> new NoteNotFoundException("Note not found at path: " + normalizedPath));
+        return getNoteBySlug(rawPath);
     }
 
     @Transactional
-    public NoteResponse upsertNote(String rawPath, UpdateNoteRequest request) {
-        String normalizedPath = PathNormalizer.normalize(rawPath);
+    public NoteResponse upsertNote(String rawSlug, UpdateNoteRequest request) {
+        String slug = SlugValidator.validate(rawSlug);
         String content = request != null ? request.content() : null;
 
-        Note note = noteRepository.findByPath(normalizedPath)
+        Note note = noteRepository.findByPath(slug)
                 .map(existingNote -> {
                     existingNote.setContent(content);
                     return existingNote;
                 })
-                .orElseGet(() -> new Note(normalizedPath, content));
+                .orElseGet(() -> new Note(slug, content));
 
         Note savedNote = noteRepository.save(note);
         NoteResponse response = NoteResponse.fromEntity(savedNote);
 
-        // Notify all clients subscribed to this specific note path about the update
-        broadcastNoteUpdate(normalizedPath, response);
+        // Notify all clients subscribed to this specific note slug about the update
+        broadcastNoteUpdate(slug, response);
 
         return response;
     }
 
     /**
-     * Register a new SSE connection to receive updates for the note at the specified path.
+     * Register a new SSE connection to receive updates for the note with the specified slug.
      */
-    public SseEmitter subscribeToNoteStream(String rawPath) {
-        String normalizedPath = PathNormalizer.normalize(rawPath);
+    public SseEmitter subscribeToNoteStream(String rawSlug) {
+        String slug = SlugValidator.validate(rawSlug);
         SseEmitter emitter = new SseEmitter(180_000L); // Default 3-minute timeout
 
-        emittersByPath.computeIfAbsent(normalizedPath, k -> new CopyOnWriteArrayList<>()).add(emitter);
+        emittersBySlug.computeIfAbsent(slug, k -> new CopyOnWriteArrayList<>()).add(emitter);
 
         // Remove the emitter from the list when the connection is completed, timed out, or encounters an error
-        Runnable cleanup = () -> removeEmitter(normalizedPath, emitter);
+        Runnable cleanup = () -> removeEmitter(slug, emitter);
         emitter.onCompletion(cleanup);
         emitter.onTimeout(cleanup);
         emitter.onError(throwable -> cleanup.run());
@@ -81,10 +81,10 @@ public class NoteService {
     }
 
     /**
-     * Send the updated note data to all clients connected to the corresponding path.
+     * Send the updated note data to all clients connected to the corresponding slug.
      */
-    private void broadcastNoteUpdate(String normalizedPath, NoteResponse response) {
-        List<SseEmitter> emitters = emittersByPath.get(normalizedPath);
+    private void broadcastNoteUpdate(String slug, NoteResponse response) {
+        List<SseEmitter> emitters = emittersBySlug.get(slug);
         if (emitters == null || emitters.isEmpty()) {
             return;
         }
@@ -94,20 +94,20 @@ public class NoteService {
                 emitter.send(response);
             } catch (IOException | IllegalStateException e) {
                 emitter.complete();
-                removeEmitter(normalizedPath, emitter);
+                removeEmitter(slug, emitter);
             }
         }
     }
 
     /**
-     * Remove an emitter from the list for a specific path to prevent memory leaks.
+     * Remove an emitter from the list for a specific slug to prevent memory leaks.
      */
-    private void removeEmitter(String normalizedPath, SseEmitter emitter) {
-        List<SseEmitter> emitters = emittersByPath.get(normalizedPath);
+    private void removeEmitter(String slug, SseEmitter emitter) {
+        List<SseEmitter> emitters = emittersBySlug.get(slug);
         if (emitters != null) {
             emitters.remove(emitter);
             if (emitters.isEmpty()) {
-                emittersByPath.remove(normalizedPath);
+                emittersBySlug.remove(slug);
             }
         }
     }

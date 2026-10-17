@@ -40,6 +40,20 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    @DisplayName("Should return 400 ProblemDetail for InvalidSlugException")
+    void shouldHandleInvalidSlugException() {
+        InvalidSlugException exception = new InvalidSlugException("The slug 'api' is reserved and cannot be used.");
+
+        ProblemDetail problemDetail = exceptionHandler.handleInvalidSlugException(exception);
+
+        assertThat(problemDetail).isNotNull();
+        assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
+        assertThat(problemDetail.getTitle()).isEqualTo("Invalid Slug");
+        assertThat(problemDetail.getDetail()).isEqualTo("The slug 'api' is reserved and cannot be used.");
+        assertThat(problemDetail.getProperties()).containsKey("timestamp");
+    }
+
+    @Test
     @DisplayName("Should return 400 ProblemDetail with field errors for MethodArgumentNotValidException")
     @SuppressWarnings("unchecked")
     void shouldHandleValidationException() {

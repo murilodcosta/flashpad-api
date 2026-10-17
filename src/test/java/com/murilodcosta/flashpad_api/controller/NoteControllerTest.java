@@ -3,6 +3,7 @@ package com.murilodcosta.flashpad_api.controller;
 import com.murilodcosta.flashpad_api.dto.NoteResponse;
 import com.murilodcosta.flashpad_api.dto.UpdateNoteRequest;
 import com.murilodcosta.flashpad_api.exception.GlobalExceptionHandler;
+import com.murilodcosta.flashpad_api.exception.InvalidSlugException;
 import com.murilodcosta.flashpad_api.exception.NoteNotFoundException;
 import com.murilodcosta.flashpad_api.service.NoteService;
 import org.junit.jupiter.api.DisplayName;
@@ -69,6 +70,21 @@ class NoteControllerTest {
                 .andExpect(jsonPath("$.status").value(404));
 
         verify(noteService).getNoteBySlug("unknown");
+    }
+
+    @Test
+    @DisplayName("GET /api/pads/{slug} should return 400 ProblemDetail when slug is invalid or reserved")
+    void shouldReturn400WhenSlugIsInvalid() throws Exception {
+        when(noteService.getNoteBySlug("api"))
+                .thenThrow(new InvalidSlugException("The slug 'api' is reserved and cannot be used."));
+
+        mockMvc.perform(get("/api/pads/api"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title").value("Invalid Slug"))
+                .andExpect(jsonPath("$.detail").value("The slug 'api' is reserved and cannot be used."))
+                .andExpect(jsonPath("$.status").value(400));
+
+        verify(noteService).getNoteBySlug("api");
     }
 
     @Test
