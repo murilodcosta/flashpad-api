@@ -29,6 +29,11 @@ public class NoteService {
     }
 
     @Transactional(readOnly = true)
+    public NoteResponse getNoteBySlug(String rawSlug) {
+        return getNoteByPath(rawSlug);
+    }
+
+    @Transactional(readOnly = true)
     public NoteResponse getNoteByPath(String rawPath) {
         String normalizedPath = PathNormalizer.normalize(rawPath);
         return noteRepository.findByPath(normalizedPath)

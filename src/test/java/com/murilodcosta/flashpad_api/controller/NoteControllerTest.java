@@ -37,135 +37,92 @@ class NoteControllerTest {
     private NoteService noteService;
 
     @Test
-    @DisplayName("GET /api/v1/notes/{path} should return 200 and NoteResponse for simple path")
-    void shouldReturnNoteForSimplePath() throws Exception {
+    @DisplayName("GET /api/pads/{slug} should return 200 and NoteResponse for valid slug")
+    void shouldReturnNoteForValidSlug() throws Exception {
         NoteResponse response = new NoteResponse(
-                "/test-note",
+                "test-note",
                 "Hello World",
                 LocalDateTime.of(2026, 9, 28, 12, 0),
                 null
         );
 
-        when(noteService.getNoteByPath("/test-note")).thenReturn(response);
+        when(noteService.getNoteBySlug("test-note")).thenReturn(response);
 
-        mockMvc.perform(get("/api/v1/notes/test-note"))
+        mockMvc.perform(get("/api/pads/test-note"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.path").value("/test-note"))
+                .andExpect(jsonPath("$.slug").value("test-note"))
                 .andExpect(jsonPath("$.content").value("Hello World"));
 
-        verify(noteService).getNoteByPath("/test-note");
+        verify(noteService).getNoteBySlug("test-note");
     }
 
     @Test
-    @DisplayName("GET /api/v1/notes/{*path} should return 200 for nested multi-level path")
-    void shouldReturnNoteForNestedPath() throws Exception {
-        NoteResponse response = new NoteResponse(
-                "/docs/chapter-1/page-42",
-                "Nested documentation content",
-                LocalDateTime.of(2026, 9, 28, 12, 0),
-                null
-        );
-
-        when(noteService.getNoteByPath("/docs/chapter-1/page-42")).thenReturn(response);
-
-        mockMvc.perform(get("/api/v1/notes/docs/chapter-1/page-42"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.path").value("/docs/chapter-1/page-42"))
-                .andExpect(jsonPath("$.content").value("Nested documentation content"));
-
-        verify(noteService).getNoteByPath("/docs/chapter-1/page-42");
-    }
-
-    @Test
-    @DisplayName("GET /api/v1/notes/{path} should return 404 ProblemDetail when note does not exist")
+    @DisplayName("GET /api/pads/{slug} should return 404 ProblemDetail when note does not exist")
     void shouldReturn404WhenNoteNotFound() throws Exception {
-        when(noteService.getNoteByPath("/unknown"))
-                .thenThrow(new NoteNotFoundException("Note not found at path: /unknown"));
+        when(noteService.getNoteBySlug("unknown"))
+                .thenThrow(new NoteNotFoundException("Note not found with slug: unknown"));
 
-        mockMvc.perform(get("/api/v1/notes/unknown"))
+        mockMvc.perform(get("/api/pads/unknown"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.title").value("Note Not Found"))
-                .andExpect(jsonPath("$.detail").value("Note not found at path: /unknown"))
+                .andExpect(jsonPath("$.detail").value("Note not found with slug: unknown"))
                 .andExpect(jsonPath("$.status").value(404));
 
-        verify(noteService).getNoteByPath("/unknown");
+        verify(noteService).getNoteBySlug("unknown");
     }
 
     @Test
-    @DisplayName("PUT /api/v1/notes/{path} should parse JSON body into UpdateNoteRequest correctly")
+    @DisplayName("PUT /api/pads/{slug} should parse JSON body into UpdateNoteRequest correctly")
     void shouldUpsertNoteWithJsonBody() throws Exception {
         NoteResponse response = new NoteResponse(
-                "/my-note",
+                "my-note",
                 "Saved content",
                 LocalDateTime.of(2026, 9, 28, 12, 0),
                 LocalDateTime.of(2026, 9, 28, 12, 5)
         );
 
-        when(noteService.upsertNote(eq("/my-note"), any(UpdateNoteRequest.class)))
+        when(noteService.upsertNote(eq("my-note"), any(UpdateNoteRequest.class)))
                 .thenReturn(response);
 
-        mockMvc.perform(put("/api/v1/notes/my-note")
+        mockMvc.perform(put("/api/pads/my-note")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"content\":\"Saved content\"}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.path").value("/my-note"))
+                .andExpect(jsonPath("$.slug").value("my-note"))
                 .andExpect(jsonPath("$.content").value("Saved content"));
 
         ArgumentCaptor<UpdateNoteRequest> captor = ArgumentCaptor.forClass(UpdateNoteRequest.class);
-        verify(noteService).upsertNote(eq("/my-note"), captor.capture());
+        verify(noteService).upsertNote(eq("my-note"), captor.capture());
         assertThat(captor.getValue().content()).isEqualTo("Saved content");
     }
 
     @Test
-    @DisplayName("PUT /api/v1/notes/{*path} should support nested multi-level path on upsert")
-    void shouldUpsertNoteWithNestedPath() throws Exception {
-        NoteResponse response = new NoteResponse(
-                "/folder/subfolder/my-note",
-                "Deep note content",
-                LocalDateTime.of(2026, 9, 28, 12, 0),
-                null
-        );
-
-        when(noteService.upsertNote(eq("/folder/subfolder/my-note"), any(UpdateNoteRequest.class)))
-                .thenReturn(response);
-
-        mockMvc.perform(put("/api/v1/notes/folder/subfolder/my-note")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"content\":\"Deep note content\"}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.path").value("/folder/subfolder/my-note"))
-                .andExpect(jsonPath("$.content").value("Deep note content"));
-
-        verify(noteService).upsertNote(eq("/folder/subfolder/my-note"), any(UpdateNoteRequest.class));
-    }
-
-    @Test
-    @DisplayName("PUT /api/v1/notes/{path} without request body should pass null request to service")
+    @DisplayName("PUT /api/pads/{slug} without request body should pass null request to service")
     void shouldUpsertNoteWithoutBody() throws Exception {
         NoteResponse response = new NoteResponse(
-                "/empty-note",
+                "empty-note",
                 null,
                 LocalDateTime.of(2026, 9, 28, 12, 0),
                 null
         );
 
-        when(noteService.upsertNote(eq("/empty-note"), eq(null)))
+        when(noteService.upsertNote(eq("empty-note"), eq(null)))
                 .thenReturn(response);
 
-        mockMvc.perform(put("/api/v1/notes/empty-note"))
+        mockMvc.perform(put("/api/pads/empty-note"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.path").value("/empty-note"))
+                .andExpect(jsonPath("$.slug").value("empty-note"))
                 .andExpect(jsonPath("$.content").isEmpty());
 
-        verify(noteService).upsertNote("/empty-note", null);
+        verify(noteService).upsertNote("empty-note", null);
     }
 
     @Test
-    @DisplayName("PUT /api/v1/notes/{path} with content exceeding max length should return 400 Bad Request")
+    @DisplayName("PUT /api/pads/{slug} with content exceeding max length should return 400 Bad Request")
     void shouldReturn400WhenContentExceedsMaxLength() throws Exception {
         String oversizedContent = "a".repeat(100_001);
 
-        mockMvc.perform(put("/api/v1/notes/oversized")
+        mockMvc.perform(put("/api/pads/oversized")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"content\":\"" + oversizedContent + "\"}"))
                 .andExpect(status().isBadRequest())
@@ -174,12 +131,12 @@ class NoteControllerTest {
     }
 
     @Test
-    @DisplayName("GET /api/v1/notes/{path}/stream should subscribe to SSE and return 200")
+    @DisplayName("GET /api/pads/{slug}/stream should subscribe to SSE and return 200")
     void shouldSubscribeToNoteStream() throws Exception {
         SseEmitter emitter = new SseEmitter();
         when(noteService.subscribeToNoteStream("my-note")).thenReturn(emitter);
 
-        mockMvc.perform(get("/api/v1/notes/my-note/stream"))
+        mockMvc.perform(get("/api/pads/my-note/stream"))
                 .andExpect(status().isOk());
 
         verify(noteService).subscribeToNoteStream("my-note");

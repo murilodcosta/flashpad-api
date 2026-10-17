@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @RestController
-@RequestMapping("/api/v1/notes")
+@RequestMapping("/api/pads")
 public class NoteController {
 
     private final NoteService noteService;
@@ -18,24 +18,24 @@ public class NoteController {
         this.noteService = noteService;
     }
 
-    @GetMapping("/{*path}")
-    public NoteResponse getNoteByPath(@PathVariable String path) {
-        return noteService.getNoteByPath(path);
+    @GetMapping("/{slug}")
+    public NoteResponse getNoteBySlug(@PathVariable String slug) {
+        return noteService.getNoteBySlug(slug);
     }
 
-    @PutMapping("/{*path}")
+    @PutMapping("/{slug}")
     public NoteResponse upsertNote(
-            @PathVariable String path,
+            @PathVariable String slug,
             @Valid @RequestBody(required = false) UpdateNoteRequest request
     ) {
-        return noteService.upsertNote(path, request);
+        return noteService.upsertNote(slug, request);
     }
 
     /**
      * Subscribe to Server-Sent Events (SSE) stream to receive real-time updates for the note.
      */
-    @GetMapping(value = "/{path}/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter streamNoteUpdates(@PathVariable String path) {
-        return noteService.subscribeToNoteStream(path);
+    @GetMapping(value = "/{slug}/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter streamNoteUpdates(@PathVariable String slug) {
+        return noteService.subscribeToNoteStream(slug);
     }
 }

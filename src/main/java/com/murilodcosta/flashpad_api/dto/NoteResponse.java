@@ -5,7 +5,7 @@ import com.murilodcosta.flashpad_api.entity.Note;
 import java.time.LocalDateTime;
 
 public record NoteResponse(
-        String path,
+        String slug,
         String content,
         LocalDateTime createdAt,
         LocalDateTime updatedAt
@@ -17,5 +17,9 @@ public record NoteResponse(
                 note.getCreatedAt(),
                 note.getUpdatedAt()
         );
+    }
+
+    public String path() {
+        return slug;
     }
 }

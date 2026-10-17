@@ -278,8 +278,8 @@
 
     <div class="controls">
         <div class="path-group">
-            <span>/api/v1/notes/</span>
-            <input type="text" id="pathInput" class="path-input" value="my-note" placeholder="enter note path...">
+            <span>/api/pads/</span>
+            <input type="text" id="pathInput" class="path-input" value="my-note" placeholder="enter note slug...">
         </div>
         <button id="btnConnect" class="btn-connect" onclick="toggleConnection()">Connect Stream</button>
         <button id="btnSave" class="btn-save" onclick="saveNote()">
@@ -344,7 +344,7 @@
 
         async function loadInitialNote(path) {
             try {
-                const response = await fetch(`/api/v1/notes/${path}`);
+                const response = await fetch(`/api/pads/${path}`);
                 if (response.ok) {
                     const data = await response.json();
                     noteContent.value = data.content || '';
@@ -368,7 +368,7 @@
 
         function connectStream() {
             const path = getCleanPath();
-            const streamUrl = `/api/v1/notes/${path}/stream`;
+            const streamUrl = `/api/pads/${path}/stream`;
 
             disconnectStream();
 
@@ -425,8 +425,8 @@
             const content = noteContent.value;
 
             try {
-                logEvent('Sending PUT', `Saving note to /api/v1/notes/${path}...`, 'sent');
-                const response = await fetch(`/api/v1/notes/${path}`, {
+                logEvent('Sending PUT', `Saving note to /api/pads/${path}...`, 'sent');
+                const response = await fetch(`/api/pads/${path}`, {
                     method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json'
