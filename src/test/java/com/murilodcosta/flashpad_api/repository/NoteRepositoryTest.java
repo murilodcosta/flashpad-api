@@ -31,23 +31,23 @@ class NoteRepositoryTest {
     }
 
     @Test
-    @DisplayName("Should find a note by path when it exists")
-    void shouldFindNoteByPathWhenExists() {
-        Note note = new Note("/my-note", "Sample content");
+    @DisplayName("Should find a note by slug when it exists")
+    void shouldFindNoteBySlugWhenExists() {
+        Note note = new Note("my-note", "Sample content");
         entityManager.persistAndFlush(note);
 
-        Optional<Note> found = noteRepository.findByPath("/my-note");
+        Optional<Note> found = noteRepository.findBySlug("my-note");
 
         assertThat(found).isPresent();
-        assertThat(found.get().getPath()).isEqualTo("/my-note");
+        assertThat(found.get().getSlug()).isEqualTo("my-note");
         assertThat(found.get().getContent()).isEqualTo("Sample content");
         assertThat(found.get().getCreatedAt()).isNotNull();
     }
 
     @Test
-    @DisplayName("Should return empty Optional when path does not exist")
-    void shouldReturnEmptyWhenPathNotFound() {
-        Optional<Note> found = noteRepository.findByPath("/non-existent");
+    @DisplayName("Should return empty Optional when slug does not exist")
+    void shouldReturnEmptyWhenSlugNotFound() {
+        Optional<Note> found = noteRepository.findBySlug("non-existent");
 
         assertThat(found).isEmpty();
     }
@@ -55,11 +55,11 @@ class NoteRepositoryTest {
     @Test
     @DisplayName("Should save a new note with createdAt populated")
     void shouldSaveNewNote() {
-        Note note = new Note("/shopping-list", "Eggs, Milk, Bread");
+        Note note = new Note("shopping-list", "Eggs, Milk, Bread");
         Note savedNote = noteRepository.saveAndFlush(note);
 
         assertThat(savedNote.getId()).isNotNull();
-        assertThat(savedNote.getPath()).isEqualTo("/shopping-list");
+        assertThat(savedNote.getSlug()).isEqualTo("shopping-list");
         assertThat(savedNote.getContent()).isEqualTo("Eggs, Milk, Bread");
         assertThat(savedNote.getCreatedAt()).isNotNull();
     }
@@ -67,7 +67,7 @@ class NoteRepositoryTest {
     @Test
     @DisplayName("Should update an existing note and populate updatedAt")
     void shouldUpdateNoteContent() {
-        Note note = new Note("/project-notes", "Initial version");
+        Note note = new Note("project-notes", "Initial version");
         Note savedNote = noteRepository.saveAndFlush(note);
 
         savedNote.setContent("Updated version");
@@ -78,12 +78,12 @@ class NoteRepositoryTest {
     }
 
     @Test
-    @DisplayName("Should enforce uniqueness on path column")
-    void shouldThrowExceptionWhenDuplicatePath() {
-        Note first = new Note("/duplicate-test", "First content");
+    @DisplayName("Should enforce uniqueness on slug column")
+    void shouldThrowExceptionWhenDuplicateSlug() {
+        Note first = new Note("duplicate-test", "First content");
         entityManager.persistAndFlush(first);
 
-        Note second = new Note("/duplicate-test", "Second content");
+        Note second = new Note("duplicate-test", "Second content");
 
         assertThatThrownBy(() -> {
             noteRepository.saveAndFlush(second);

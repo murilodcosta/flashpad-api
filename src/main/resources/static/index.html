@@ -279,7 +279,7 @@
     <div class="controls">
         <div class="path-group">
             <span>/api/pads/</span>
-            <input type="text" id="pathInput" class="path-input" value="my-note" placeholder="enter note slug...">
+            <input type="text" id="slugInput" class="path-input" value="my-note" placeholder="enter note slug...">
         </div>
         <button id="btnConnect" class="btn-connect" onclick="toggleConnection()">Connect Stream</button>
         <button id="btnSave" class="btn-save" onclick="saveNote()">
@@ -312,7 +312,7 @@
 
     <script>
         let eventSource = null;
-        const pathInput = document.getElementById('pathInput');
+        const slugInput = document.getElementById('slugInput');
         const statusBadge = document.getElementById('statusBadge');
         const statusText = document.getElementById('statusText');
         const btnConnect = document.getElementById('btnConnect');
@@ -336,25 +336,25 @@
             logList.innerHTML = '';
         }
 
-        function getCleanPath() {
-            let path = pathInput.value.trim();
-            if (path.startsWith('/')) path = path.substring(1);
-            return path || 'my-note';
+        function getCleanSlug() {
+            let slug = slugInput.value.trim();
+            if (slug.startsWith('/')) slug = slug.substring(1);
+            return slug || 'my-note';
         }
 
-        async function loadInitialNote(path) {
+        async function loadInitialNote(slug) {
             try {
-                const response = await fetch(`/api/pads/${path}`);
+                const response = await fetch(`/api/pads/${slug}`);
                 if (response.ok) {
                     const data = await response.json();
                     noteContent.value = data.content || '';
                     lastUpdated.innerText = `Last updated: ${new Date(data.updatedAt || data.createdAt).toLocaleTimeString()}`;
-                    logEvent('GET Note', `Initial content loaded (${(data.content || '').length} characters)`);
+                    logEvent('GET Pad', `Initial content loaded (${(data.content || '').length} characters)`);
                 } else if (response.status === 404) {
-                    logEvent('GET 404', 'Note not created in database yet. Start typing to create it!');
+                    logEvent('GET 404', 'Pad not created in database yet. Start typing to create it!');
                 }
             } catch (err) {
-                console.error("Failed to load initial note:", err);
+                console.error("Failed to load initial pad:", err);
             }
         }
 
@@ -367,15 +367,15 @@
         }
 
         function connectStream() {
-            const path = getCleanPath();
-            const streamUrl = `/api/pads/${path}/stream`;
+            const slug = getCleanSlug();
+            const streamUrl = `/api/pads/${slug}/stream`;
 
             disconnectStream();
 
             logEvent('Connecting', `Opening SSE stream at: ${streamUrl}`);
             statusText.innerText = 'Connecting...';
 
-            loadInitialNote(path);
+            loadInitialNote(slug);
 
             eventSource = new EventSource(streamUrl);
 
@@ -385,8 +385,8 @@
                 btnConnect.innerText = 'Disconnect';
                 btnConnect.style.backgroundColor = 'var(--error-color)';
                 btnConnect.style.color = '#fff';
-                noteInfo.innerText = `Note: /${path}`;
-                logEvent('Connected', `Listening for real-time events on /${path}`, 'update');
+                noteInfo.innerText = `Pad: ${slug}`;
+                logEvent('Connected', `Listening for real-time events on ${slug}`, 'update');
             };
 
             eventSource.onmessage = (event) => {
@@ -421,12 +421,12 @@
         }
 
         async function saveNote() {
-            const path = getCleanPath();
+            const slug = getCleanSlug();
             const content = noteContent.value;
 
             try {
-                logEvent('Sending PUT', `Saving note to /api/pads/${path}...`, 'sent');
-                const response = await fetch(`/api/pads/${path}`, {
+                logEvent('Sending PUT', `Saving pad to /api/pads/${slug}...`, 'sent');
+                const response = await fetch(`/api/pads/${slug}`, {
                     method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json'
@@ -437,10 +437,10 @@
                 if (response.ok) {
                     const data = await response.json();
                     lastUpdated.innerText = `Last updated: ${new Date(data.updatedAt || data.createdAt || Date.now()).toLocaleTimeString()}`;
-                    logEvent('PUT 200 OK', 'Note saved and broadcast to all connected clients!', 'sent');
+                    logEvent('PUT 200 OK', 'Pad saved and broadcast to all connected clients!', 'sent');
                 } else {
                     const error = await response.json();
-                    logEvent('PUT Error', error.detail || 'Failed to save note', 'error');
+                    logEvent('PUT Error', error.detail || 'Failed to save pad', 'error');
                 }
             } catch (err) {
                 logEvent('Network Error', err.message, 'error');

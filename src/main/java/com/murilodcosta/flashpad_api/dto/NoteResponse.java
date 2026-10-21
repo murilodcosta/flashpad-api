@@ -12,14 +12,10 @@ public record NoteResponse(
 ) {
     public static NoteResponse fromEntity(Note note) {
         return new NoteResponse(
-                note.getPath(),
+                note.getSlug(),
                 note.getContent(),
                 note.getCreatedAt(),
                 note.getUpdatedAt()
         );
-    }
-
-    public String path() {
-        return slug;
     }
 }

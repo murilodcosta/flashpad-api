@@ -39,7 +39,7 @@ class NoteServiceTest {
         LocalDateTime now = LocalDateTime.now();
         Note existingNote = new Note(1L, normalizedSlug, "Hello World", now, null);
 
-        when(noteRepository.findByPath(normalizedSlug)).thenReturn(Optional.of(existingNote));
+        when(noteRepository.findBySlug(normalizedSlug)).thenReturn(Optional.of(existingNote));
 
         NoteResponse response = noteService.getNoteBySlug(rawSlug);
 
@@ -47,7 +47,7 @@ class NoteServiceTest {
         assertThat(response.slug()).isEqualTo(normalizedSlug);
         assertThat(response.content()).isEqualTo("Hello World");
         assertThat(response.createdAt()).isEqualTo(now);
-        verify(noteRepository).findByPath(normalizedSlug);
+        verify(noteRepository).findBySlug(normalizedSlug);
     }
 
     @Test
@@ -55,13 +55,13 @@ class NoteServiceTest {
     void shouldThrowExceptionWhenNoteDoesNotExist() {
         String slug = "unknown-note";
 
-        when(noteRepository.findByPath(slug)).thenReturn(Optional.empty());
+        when(noteRepository.findBySlug(slug)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> noteService.getNoteBySlug(slug))
                 .isInstanceOf(NoteNotFoundException.class)
                 .hasMessage("Note not found with slug: " + slug);
 
-        verify(noteRepository).findByPath(slug);
+        verify(noteRepository).findBySlug(slug);
     }
 
     @Test
@@ -83,7 +83,7 @@ class NoteServiceTest {
         String rawSlug = "new-note";
         UpdateNoteRequest request = new UpdateNoteRequest("Brand new content");
 
-        when(noteRepository.findByPath(rawSlug)).thenReturn(Optional.empty());
+        when(noteRepository.findBySlug(rawSlug)).thenReturn(Optional.empty());
         when(noteRepository.save(any(Note.class))).thenAnswer(invocation -> {
             Note noteToSave = invocation.getArgument(0);
             noteToSave.setId(10L);
@@ -100,7 +100,7 @@ class NoteServiceTest {
         ArgumentCaptor<Note> noteCaptor = ArgumentCaptor.forClass(Note.class);
         verify(noteRepository).save(noteCaptor.capture());
         Note captured = noteCaptor.getValue();
-        assertThat(captured.getPath()).isEqualTo(rawSlug);
+        assertThat(captured.getSlug()).isEqualTo(rawSlug);
         assertThat(captured.getContent()).isEqualTo("Brand new content");
     }
 
@@ -112,7 +112,7 @@ class NoteServiceTest {
 
         Note existingNote = new Note(5L, slug, "Old content", LocalDateTime.now().minusHours(1), null);
 
-        when(noteRepository.findByPath(slug)).thenReturn(Optional.of(existingNote));
+        when(noteRepository.findBySlug(slug)).thenReturn(Optional.of(existingNote));
         when(noteRepository.save(existingNote)).thenAnswer(invocation -> {
             Note note = invocation.getArgument(0);
             note.setUpdatedAt(LocalDateTime.now());
@@ -133,7 +133,7 @@ class NoteServiceTest {
     void shouldHandleNullRequestDuringUpsert() {
         String slug = "empty-note";
 
-        when(noteRepository.findByPath(slug)).thenReturn(Optional.empty());
+        when(noteRepository.findBySlug(slug)).thenReturn(Optional.empty());
         when(noteRepository.save(any(Note.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         NoteResponse response = noteService.upsertNote(slug, null);
@@ -154,11 +154,11 @@ class NoteServiceTest {
     @Test
     @DisplayName("Should broadcast update only to emitters subscribed to the matching slug")
     void shouldBroadcastOnlyToMatchingSlugEmitters() {
-        var emitterPathA = noteService.subscribeToNoteStream("note-a");
-        var emitterPathB = noteService.subscribeToNoteStream("note-b");
+        var emitterSlugA = noteService.subscribeToNoteStream("note-a");
+        var emitterSlugB = noteService.subscribeToNoteStream("note-b");
 
         Note noteA = new Note(1L, "note-a", "Updated A", LocalDateTime.now(), null);
-        when(noteRepository.findByPath("note-a")).thenReturn(Optional.of(noteA));
+        when(noteRepository.findBySlug("note-a")).thenReturn(Optional.of(noteA));
         when(noteRepository.save(any(Note.class))).thenReturn(noteA);
 
         // Trigger upsert for note-a

@@ -28,14 +28,14 @@ class GlobalExceptionHandlerTest {
     @Test
     @DisplayName("Should return 404 ProblemDetail for NoteNotFoundException")
     void shouldHandleNoteNotFoundException() {
-        NoteNotFoundException exception = new NoteNotFoundException("Note not found at path: /test");
+        NoteNotFoundException exception = new NoteNotFoundException("Note not found with slug: test");
 
         ProblemDetail problemDetail = exceptionHandler.handleNoteNotFoundException(exception);
 
         assertThat(problemDetail).isNotNull();
         assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.NOT_FOUND.value());
         assertThat(problemDetail.getTitle()).isEqualTo("Note Not Found");
-        assertThat(problemDetail.getDetail()).isEqualTo("Note not found at path: /test");
+        assertThat(problemDetail.getDetail()).isEqualTo("Note not found with slug: test");
         assertThat(problemDetail.getProperties()).containsKey("timestamp");
     }
 

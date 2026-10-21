@@ -31,14 +31,9 @@ public class NoteService {
     @Transactional(readOnly = true)
     public NoteResponse getNoteBySlug(String rawSlug) {
         String slug = SlugValidator.validate(rawSlug);
-        return noteRepository.findByPath(slug)
+        return noteRepository.findBySlug(slug)
                 .map(NoteResponse::fromEntity)
                 .orElseThrow(() -> new NoteNotFoundException("Note not found with slug: " + slug));
-    }
-
-    @Transactional(readOnly = true)
-    public NoteResponse getNoteByPath(String rawPath) {
-        return getNoteBySlug(rawPath);
     }
 
     @Transactional
@@ -46,12 +41,13 @@ public class NoteService {
         String slug = SlugValidator.validate(rawSlug);
         String content = request != null ? request.content() : null;
 
-        Note note = noteRepository.findByPath(slug)
+        Note note = noteRepository.findBySlug(slug)
                 .map(existingNote -> {
                     existingNote.setContent(content);
                     return existingNote;
                 })
                 .orElseGet(() -> new Note(slug, content));
+
 
         Note savedNote = noteRepository.save(note);
         NoteResponse response = NoteResponse.fromEntity(savedNote);

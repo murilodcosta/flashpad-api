@@ -21,7 +21,7 @@ public class Note {
     private Long id;
 
     @Column(nullable = false, unique = true)
-    private String path;
+    private String slug;
 
     private String content;
 
@@ -31,8 +31,8 @@ public class Note {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    public Note(String path, String content) {
-        this.path = path;
+    public Note(String slug, String content) {
+        this.slug = slug;
         this.content = content;
     }
 

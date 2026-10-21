@@ -7,5 +7,5 @@ import java.util.Optional;
 
 public interface NoteRepository extends JpaRepository<Note, Long> {
 
-    Optional<Note> findByPath(String path);
+    Optional<Note> findBySlug(String slug);
 }
