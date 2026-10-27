@@ -25,6 +25,10 @@ public class Note {
 
     private String content;
 
+    @Version
+    @Column(nullable = false)
+    private Long version;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
@@ -34,6 +38,10 @@ public class Note {
     public Note(String slug, String content) {
         this.slug = slug;
         this.content = content;
+    }
+
+    public boolean isNew() {
+        return this.id == null;
     }
 
     @PrePersist

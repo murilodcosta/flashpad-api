@@ -5,6 +5,7 @@ import com.murilodcosta.flashpad_api.dto.UpdateNoteRequest;
 import com.murilodcosta.flashpad_api.exception.GlobalExceptionHandler;
 import com.murilodcosta.flashpad_api.exception.InvalidSlugException;
 import com.murilodcosta.flashpad_api.exception.NoteNotFoundException;
+import com.murilodcosta.flashpad_api.exception.VersionConflictException;
 import com.murilodcosta.flashpad_api.service.NoteService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -38,11 +39,12 @@ class NoteControllerTest {
     private NoteService noteService;
 
     @Test
-    @DisplayName("GET /api/pads/{slug} should return 200 and NoteResponse for valid slug")
+    @DisplayName("GET /api/pads/{slug} should return 200 and NoteResponse with version for valid slug")
     void shouldReturnNoteForValidSlug() throws Exception {
         NoteResponse response = new NoteResponse(
                 "test-note",
                 "Hello World",
+                0L,
                 LocalDateTime.of(2026, 9, 28, 12, 0),
                 null
         );
@@ -52,7 +54,8 @@ class NoteControllerTest {
         mockMvc.perform(get("/api/pads/test-note"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.slug").value("test-note"))
-                .andExpect(jsonPath("$.content").value("Hello World"));
+                .andExpect(jsonPath("$.content").value("Hello World"))
+                .andExpect(jsonPath("$.version").value(0));
 
         verify(noteService).getNoteBySlug("test-note");
     }
@@ -88,11 +91,12 @@ class NoteControllerTest {
     }
 
     @Test
-    @DisplayName("PUT /api/pads/{slug} should parse JSON body into UpdateNoteRequest correctly")
+    @DisplayName("PUT /api/pads/{slug} should parse JSON body with version and clientId into UpdateNoteRequest")
     void shouldUpsertNoteWithJsonBody() throws Exception {
         NoteResponse response = new NoteResponse(
                 "my-note",
                 "Saved content",
+                1L,
                 LocalDateTime.of(2026, 9, 28, 12, 0),
                 LocalDateTime.of(2026, 9, 28, 12, 5)
         );
@@ -102,14 +106,33 @@ class NoteControllerTest {
 
         mockMvc.perform(put("/api/pads/my-note")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"content\":\"Saved content\"}"))
+                        .content("{\"content\":\"Saved content\",\"version\":0,\"clientId\":\"client-123\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.slug").value("my-note"))
-                .andExpect(jsonPath("$.content").value("Saved content"));
+                .andExpect(jsonPath("$.content").value("Saved content"))
+                .andExpect(jsonPath("$.version").value(1));
 
         ArgumentCaptor<UpdateNoteRequest> captor = ArgumentCaptor.forClass(UpdateNoteRequest.class);
         verify(noteService).upsertNote(eq("my-note"), captor.capture());
         assertThat(captor.getValue().content()).isEqualTo("Saved content");
+        assertThat(captor.getValue().version()).isEqualTo(0L);
+        assertThat(captor.getValue().clientId()).isEqualTo("client-123");
+    }
+
+    @Test
+    @DisplayName("PUT /api/pads/{slug} should return 409 ProblemDetail on VersionConflictException")
+    void shouldReturn409OnVersionConflict() throws Exception {
+        when(noteService.upsertNote(eq("conflicted-note"), any(UpdateNoteRequest.class)))
+                .thenThrow(new VersionConflictException(3L, "Server modified content"));
+
+        mockMvc.perform(put("/api/pads/conflicted-note")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\":\"My stale content\",\"version\":1,\"clientId\":\"client-456\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.title").value("Version Conflict"))
+                .andExpect(jsonPath("$.status").value(409))
+                .andExpect(jsonPath("$.currentVersion").value(3))
+                .andExpect(jsonPath("$.currentContent").value("Server modified content"));
     }
 
     @Test
@@ -118,6 +141,7 @@ class NoteControllerTest {
         NoteResponse response = new NoteResponse(
                 "empty-note",
                 null,
+                0L,
                 LocalDateTime.of(2026, 9, 28, 12, 0),
                 null
         );
@@ -128,7 +152,8 @@ class NoteControllerTest {
         mockMvc.perform(put("/api/pads/empty-note"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.slug").value("empty-note"))
-                .andExpect(jsonPath("$.content").isEmpty());
+                .andExpect(jsonPath("$.content").isEmpty())
+                .andExpect(jsonPath("$.version").value(0));
 
         verify(noteService).upsertNote("empty-note", null);
     }

@@ -1,11 +1,14 @@
 package com.murilodcosta.flashpad_api.service;
 
 import com.murilodcosta.flashpad_api.dto.NoteResponse;
+import com.murilodcosta.flashpad_api.dto.PadUpdateEvent;
 import com.murilodcosta.flashpad_api.dto.UpdateNoteRequest;
 import com.murilodcosta.flashpad_api.entity.Note;
 import com.murilodcosta.flashpad_api.exception.NoteNotFoundException;
+import com.murilodcosta.flashpad_api.exception.VersionConflictException;
 import com.murilodcosta.flashpad_api.repository.NoteRepository;
 import com.murilodcosta.flashpad_api.util.SlugValidator;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -13,6 +16,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -21,7 +25,7 @@ public class NoteService {
 
     private final NoteRepository noteRepository;
 
-    // thread-safe map associating each slug with its connected clients via SSE
+    // Thread-safe map associating each slug with its connected clients via SSE
     private final Map<String, List<SseEmitter>> emittersBySlug = new ConcurrentHashMap<>();
 
     public NoteService(NoteRepository noteRepository) {
@@ -40,20 +44,24 @@ public class NoteService {
     public NoteResponse upsertNote(String rawSlug, UpdateNoteRequest request) {
         String slug = SlugValidator.validate(rawSlug);
         String content = request != null ? request.content() : null;
+        Long expectedVersion = request != null ? request.version() : null;
+        String clientId = request != null ? request.clientId() : null;
 
         Note note = noteRepository.findBySlug(slug)
                 .map(existingNote -> {
+                    if (!Objects.equals(expectedVersion, existingNote.getVersion())) {
+                        throw new VersionConflictException(existingNote.getVersion(), existingNote.getContent());
+                    }
                     existingNote.setContent(content);
                     return existingNote;
                 })
                 .orElseGet(() -> new Note(slug, content));
 
-
-        Note savedNote = noteRepository.save(note);
+        Note savedNote = noteRepository.saveAndFlush(note);
         NoteResponse response = NoteResponse.fromEntity(savedNote);
 
-        // Notify all clients subscribed to this specific note slug about the update
-        broadcastNoteUpdate(slug, response);
+        // Notify all clients subscribed to this pad slug with clientId for echo filtering
+        broadcastPadUpdate(slug, new PadUpdateEvent(savedNote.getContent(), savedNote.getVersion(), clientId));
 
         return response;
     }
@@ -77,9 +85,27 @@ public class NoteService {
     }
 
     /**
-     * Send the updated note data to all clients connected to the corresponding slug.
+     * Periodically send a heartbeat ping comment to keep SSE connections open behind reverse proxies.
      */
-    private void broadcastNoteUpdate(String slug, NoteResponse response) {
+    @Scheduled(fixedDelay = 25_000)
+    public void sendHeartbeat() {
+        for (Map.Entry<String, List<SseEmitter>> entry : emittersBySlug.entrySet()) {
+            String slug = entry.getKey();
+            for (SseEmitter emitter : entry.getValue()) {
+                try {
+                    emitter.send(SseEmitter.event().comment("ping"));
+                } catch (IOException | IllegalStateException e) {
+                    emitter.complete();
+                    removeEmitter(slug, emitter);
+                }
+            }
+        }
+    }
+
+    /**
+     * Broadcast pad update event named 'pad-updated' to all clients connected to the corresponding slug.
+     */
+    private void broadcastPadUpdate(String slug, PadUpdateEvent event) {
         List<SseEmitter> emitters = emittersBySlug.get(slug);
         if (emitters == null || emitters.isEmpty()) {
             return;
@@ -87,7 +113,9 @@ public class NoteService {
 
         for (SseEmitter emitter : emitters) {
             try {
-                emitter.send(response);
+                emitter.send(SseEmitter.event()
+                        .name("pad-updated")
+                        .data(event));
             } catch (IOException | IllegalStateException e) {
                 emitter.complete();
                 removeEmitter(slug, emitter);

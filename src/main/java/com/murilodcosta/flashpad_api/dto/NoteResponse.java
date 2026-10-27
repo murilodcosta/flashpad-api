@@ -7,6 +7,7 @@ import java.time.LocalDateTime;
 public record NoteResponse(
         String slug,
         String content,
+        Long version,
         LocalDateTime createdAt,
         LocalDateTime updatedAt
 ) {
@@ -14,6 +15,7 @@ public record NoteResponse(
         return new NoteResponse(
                 note.getSlug(),
                 note.getContent(),
+                note.getVersion(),
                 note.getCreatedAt(),
                 note.getUpdatedAt()
         );

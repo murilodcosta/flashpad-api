@@ -2,6 +2,7 @@ package com.murilodcosta.flashpad_api.exception;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -29,6 +30,29 @@ public class GlobalExceptionHandler {
         ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
         problemDetail.setTitle("Invalid Slug");
         problemDetail.setType(URI.create("https://flashpad.dev/errors/invalid-slug"));
+        problemDetail.setProperty("timestamp", Instant.now());
+        return problemDetail;
+    }
+
+    @ExceptionHandler(VersionConflictException.class)
+    public ProblemDetail handleVersionConflictException(VersionConflictException ex) {
+        ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        problemDetail.setTitle("Version Conflict");
+        problemDetail.setType(URI.create("https://flashpad.dev/errors/version-conflict"));
+        problemDetail.setProperty("currentVersion", ex.getCurrentVersion());
+        problemDetail.setProperty("currentContent", ex.getCurrentContent());
+        problemDetail.setProperty("timestamp", Instant.now());
+        return problemDetail;
+    }
+
+    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+    public ProblemDetail handleOptimisticLockingFailureException(ObjectOptimisticLockingFailureException ex) {
+        ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(
+                HttpStatus.CONFLICT,
+                "Concurrent modification conflict: the pad was updated by another transaction"
+        );
+        problemDetail.setTitle("Version Conflict");
+        problemDetail.setType(URI.create("https://flashpad.dev/errors/version-conflict"));
         problemDetail.setProperty("timestamp", Instant.now());
         return problemDetail;
     }

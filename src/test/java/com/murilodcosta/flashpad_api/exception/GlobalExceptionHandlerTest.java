@@ -5,6 +5,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.validation.BindingResult;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -50,6 +51,35 @@ class GlobalExceptionHandlerTest {
         assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
         assertThat(problemDetail.getTitle()).isEqualTo("Invalid Slug");
         assertThat(problemDetail.getDetail()).isEqualTo("The slug 'api' is reserved and cannot be used.");
+        assertThat(problemDetail.getProperties()).containsKey("timestamp");
+    }
+
+    @Test
+    @DisplayName("Should return 409 ProblemDetail with current version and content for VersionConflictException")
+    void shouldHandleVersionConflictException() {
+        VersionConflictException exception = new VersionConflictException(5L, "Current text in server");
+
+        ProblemDetail problemDetail = exceptionHandler.handleVersionConflictException(exception);
+
+        assertThat(problemDetail).isNotNull();
+        assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
+        assertThat(problemDetail.getTitle()).isEqualTo("Version Conflict");
+        assertThat(problemDetail.getProperties()).containsEntry("currentVersion", 5L);
+        assertThat(problemDetail.getProperties()).containsEntry("currentContent", "Current text in server");
+        assertThat(problemDetail.getProperties()).containsKey("timestamp");
+    }
+
+    @Test
+    @DisplayName("Should return 409 ProblemDetail for ObjectOptimisticLockingFailureException")
+    void shouldHandleOptimisticLockingFailureException() {
+        ObjectOptimisticLockingFailureException exception = new ObjectOptimisticLockingFailureException("Note", 1L);
+
+        ProblemDetail problemDetail = exceptionHandler.handleOptimisticLockingFailureException(exception);
+
+        assertThat(problemDetail).isNotNull();
+        assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
+        assertThat(problemDetail.getTitle()).isEqualTo("Version Conflict");
+        assertThat(problemDetail.getDetail()).contains("Concurrent modification conflict");
         assertThat(problemDetail.getProperties()).containsKey("timestamp");
     }
 

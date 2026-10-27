@@ -160,6 +160,54 @@
             filter: brightness(1.1);
         }
 
+        .conflict-banner {
+            background-color: rgba(234, 179, 8, 0.15);
+            border: 1px solid var(--warning-color);
+            border-radius: 10px;
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+            color: #fef08a;
+            font-size: 0.9rem;
+        }
+
+        .conflict-message {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .conflict-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn-conflict {
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .btn-conflict.btn-server {
+            background-color: #38bdf8;
+            color: #0f172a;
+        }
+
+        .btn-conflict.btn-mine {
+            background-color: var(--warning-color);
+            color: #0f172a;
+        }
+
+        .btn-conflict.btn-dismiss {
+            background-color: transparent;
+            color: var(--text-secondary);
+            border: 1px solid var(--border-color);
+        }
+
         .grid {
             display: grid;
             grid-template-columns: 2fr 1fr;
@@ -190,6 +238,21 @@
             border-bottom: 1px solid var(--border-color);
             font-size: 0.875rem;
             color: var(--text-secondary);
+        }
+
+        .editor-title-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .version-badge {
+            background: #334155;
+            color: var(--accent-color);
+            font-size: 0.75rem;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-weight: 600;
         }
 
         textarea {
@@ -279,21 +342,36 @@
     <div class="controls">
         <div class="path-group">
             <span>/api/pads/</span>
-            <input type="text" id="slugInput" class="path-input" value="my-note" placeholder="enter note slug...">
+            <input type="text" id="slugInput" class="path-input" value="my-note" placeholder="enter pad slug...">
         </div>
         <button id="btnConnect" class="btn-connect" onclick="toggleConnection()">Connect Stream</button>
         <button id="btnSave" class="btn-save" onclick="saveNote()">
-            <span>💾</span> Save Note (PUT)
+            <span>💾</span> Save Pad (PUT)
         </button>
+    </div>
+
+    <div id="conflictBanner" class="conflict-banner" style="display: none;">
+        <div class="conflict-message">
+            <span>⚠️</span>
+            <span><strong>Version Conflict:</strong> Someone edited this pad on the server (v<span id="conflictServerVersion"></span>). Choose an action:</span>
+        </div>
+        <div class="conflict-actions">
+            <button class="btn-conflict btn-server" onclick="resolveConflictKeepServer()">View Server Version</button>
+            <button class="btn-conflict btn-mine" onclick="resolveConflictKeepMine()">Overwrite with Mine</button>
+            <button class="btn-conflict btn-dismiss" onclick="dismissConflict()">Dismiss</button>
+        </div>
     </div>
 
     <div class="grid">
         <div class="editor-container">
             <div class="editor-header">
-                <span id="noteInfo">Note: /my-note</span>
+                <div class="editor-title-group">
+                    <span id="noteInfo">Pad: my-note</span>
+                    <span id="versionBadge" class="version-badge">v0</span>
+                </div>
                 <span id="lastUpdated">Last updated: --</span>
             </div>
-            <textarea id="noteContent" placeholder="Type something here... Any updates sent via Postman or another browser tab will sync live on this screen!"></textarea>
+            <textarea id="noteContent" placeholder="Type something here... Any updates sent via another tab or client will sync live on this screen!"></textarea>
         </div>
 
         <div class="log-container">
@@ -311,15 +389,69 @@
     </div>
 
     <script>
+        const myClientId = (typeof crypto !== 'undefined' && crypto.randomUUID)
+            ? crypto.randomUUID()
+            : 'client-' + Math.random().toString(36).substring(2, 9);
+
         let eventSource = null;
+        let currentVersion = null;
+        let lastKnownConflict = null;
+
         const slugInput = document.getElementById('slugInput');
         const statusBadge = document.getElementById('statusBadge');
         const statusText = document.getElementById('statusText');
         const btnConnect = document.getElementById('btnConnect');
         const noteContent = document.getElementById('noteContent');
         const noteInfo = document.getElementById('noteInfo');
+        const versionBadge = document.getElementById('versionBadge');
         const lastUpdated = document.getElementById('lastUpdated');
         const logList = document.getElementById('logList');
+        const conflictBanner = document.getElementById('conflictBanner');
+        const conflictServerVersion = document.getElementById('conflictServerVersion');
+
+        function updateVersionBadge(version) {
+            if (version === null || version === undefined) {
+                versionBadge.innerText = 'new (unsaved)';
+                versionBadge.style.color = 'var(--text-secondary)';
+            } else {
+                versionBadge.innerText = `v${version}`;
+                versionBadge.style.color = 'var(--accent-color)';
+            }
+        }
+
+        function showConflictBanner(serverVersion, serverContent) {
+            lastKnownConflict = { serverVersion, serverContent };
+            conflictServerVersion.innerText = serverVersion;
+            conflictBanner.style.display = 'flex';
+        }
+
+        function hideConflictBanner() {
+            conflictBanner.style.display = 'none';
+            lastKnownConflict = null;
+        }
+
+        function resolveConflictKeepServer() {
+            if (lastKnownConflict) {
+                currentVersion = lastKnownConflict.serverVersion;
+                noteContent.value = lastKnownConflict.serverContent || '';
+                updateVersionBadge(currentVersion);
+                hideConflictBanner();
+                logEvent('Conflict Resolved', `Loaded server version v${currentVersion}`, 'update');
+            }
+        }
+
+        async function resolveConflictKeepMine() {
+            if (lastKnownConflict) {
+                currentVersion = lastKnownConflict.serverVersion;
+                hideConflictBanner();
+                logEvent('Resolving Conflict', `Overwriting with local version against server v${currentVersion}...`, 'sent');
+                await saveNote();
+            }
+        }
+
+        function dismissConflict() {
+            hideConflictBanner();
+        }
 
         function logEvent(title, detail, type = 'default') {
             const now = new Date().toLocaleTimeString();
@@ -347,10 +479,16 @@
                 const response = await fetch(`/api/pads/${slug}`);
                 if (response.ok) {
                     const data = await response.json();
+                    currentVersion = data.version;
                     noteContent.value = data.content || '';
+                    updateVersionBadge(currentVersion);
                     lastUpdated.innerText = `Last updated: ${new Date(data.updatedAt || data.createdAt).toLocaleTimeString()}`;
-                    logEvent('GET Pad', `Initial content loaded (${(data.content || '').length} characters)`);
+                    logEvent('GET Pad', `Initial content loaded (${(data.content || '').length} characters, v${data.version})`);
                 } else if (response.status === 404) {
+                    currentVersion = null;
+                    noteContent.value = '';
+                    updateVersionBadge(null);
+                    lastUpdated.innerText = 'Last updated: --';
                     logEvent('GET 404', 'Pad not created in database yet. Start typing to create it!');
                 }
             } catch (err) {
@@ -389,16 +527,25 @@
                 logEvent('Connected', `Listening for real-time events on ${slug}`, 'update');
             };
 
-            eventSource.onmessage = (event) => {
+            // Listen to named SSE event 'pad-updated'
+            eventSource.addEventListener('pad-updated', (event) => {
                 try {
                     const data = JSON.parse(event.data);
-                    logEvent('⚡ SSE Received', `New content received (${(data.content || '').length} chars)`, 'update');
+                    // Echo suppression: ignore updates sent by this client
+                    if (data.clientId && data.clientId === myClientId) {
+                        return;
+                    }
+
+                    currentVersion = data.version;
                     noteContent.value = data.content || '';
-                    lastUpdated.innerText = `Last updated: ${new Date(data.updatedAt || data.createdAt || Date.now()).toLocaleTimeString()}`;
+                    updateVersionBadge(data.version);
+                    hideConflictBanner();
+                    lastUpdated.innerText = `Last updated: ${new Date().toLocaleTimeString()} (v${data.version})`;
+                    logEvent('⚡ SSE Received', `Pad updated by another client to v${data.version} (${(data.content || '').length} chars)`, 'update');
                 } catch (e) {
                     logEvent('⚡ SSE Raw', event.data, 'update');
                 }
-            };
+            });
 
             eventSource.onerror = (err) => {
                 console.warn('SSE Error / Reconnecting...', err);
@@ -425,19 +572,30 @@
             const content = noteContent.value;
 
             try {
-                logEvent('Sending PUT', `Saving pad to /api/pads/${slug}...`, 'sent');
+                logEvent('Sending PUT', `Saving pad (expected v${currentVersion !== null ? currentVersion : 'new'})...`, 'sent');
                 const response = await fetch(`/api/pads/${slug}`, {
                     method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ content: content })
+                    body: JSON.stringify({
+                        content: content,
+                        version: currentVersion,
+                        clientId: myClientId
+                    })
                 });
 
                 if (response.ok) {
                     const data = await response.json();
-                    lastUpdated.innerText = `Last updated: ${new Date(data.updatedAt || data.createdAt || Date.now()).toLocaleTimeString()}`;
-                    logEvent('PUT 200 OK', 'Pad saved and broadcast to all connected clients!', 'sent');
+                    currentVersion = data.version;
+                    updateVersionBadge(currentVersion);
+                    hideConflictBanner();
+                    lastUpdated.innerText = `Last updated: ${new Date(data.updatedAt || data.createdAt || Date.now()).toLocaleTimeString()} (v${data.version})`;
+                    logEvent('PUT 200 OK', `Pad saved as v${data.version}!`, 'sent');
+                } else if (response.status === 409) {
+                    const error = await response.json();
+                    showConflictBanner(error.currentVersion, error.currentContent);
+                    logEvent('PUT 409 Conflict', `Server is at v${error.currentVersion}. Conflict detected!`, 'error');
                 } else {
                     const error = await response.json();
                     logEvent('PUT Error', error.detail || 'Failed to save pad', 'error');
